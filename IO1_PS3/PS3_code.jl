@@ -3,6 +3,7 @@
 ### Author: Joe Wilske
 ### Date: December 21, 2023
 
+
 using Statistics, Random, Distributions, Optim, LinearAlgebra
 
 
@@ -20,7 +21,7 @@ function log_sum(a, i, μ, R, EV_0, EV_1, β)
 
     i == 0 ? (a = min(a + 1, 5)) : (a = 1)
 
-    return log( exp( π(a, 0, μ, R) + β*EV_0[a]) + exp( π(a, 1, μ, R) + β*EV_1[a]) )
+    log( exp( π(a, 0, μ, R) + β*EV_0[a]) + exp( π(a, 1, μ, R) + β*EV_1[a]) )
 end
 
 # Present value function, taking all future expected values into account.
@@ -47,17 +48,19 @@ function contraction_map(μ, R, β)
         
         cond_0 = abs.(V_0 - prev_V_0) .== 0.0
         cond_1 = abs.(V_1 - prev_V_1) .== 0.0
-
-        if all(x -> x == 1, cond_0) && all(y -> y == 1, cond_1) 
+        
+        if all(x -> x == 1, cond_0) && all(y -> y == 1, cond_1)
             break
         end
+
     end
 
-    return hcat(V_0, V_1)
+    hcat(V_0, V_1)
 end
 
 
 ### --- (3 a) --- ######################################################################
+
 
 # Specify parameters
 (μ, R, β) = (-1, -3, 0.9)
@@ -80,6 +83,7 @@ val = max(values[4, 1] + 1, values[4, 2] + 1.5)
 ### --- (4) Simulate Data --- ##########################################################
 ########################################################################################
 
+
 # Given an a, takes ε draws and compares resultant firm values. 
 # Returns the optimal i decision.
 function i_from_a(a, μ, R, V, β)
@@ -87,7 +91,7 @@ function i_from_a(a, μ, R, V, β)
     V_0 = V[a, 1] + rand(Gumbel(0, 1))
     V_1 = V[a, 2] + rand(Gumbel(0, 1))
     
-    (V_0 > V_1) ? (return 0) : (return 1)
+    V_0 > V_1  ?  0  :  1
 end
 
 # Given μ, R, β, and number of observations T, generates a simulated dataset.
@@ -117,7 +121,7 @@ function generate_data(μ, R, β, T)
 
     i_vec[T] = i_from_a(a_vec[T], μ, R, V, β)
 
-    return hcat(a_vec, i_vec)
+    hcat(a_vec, i_vec)
 end
 
 # Generate simulated data
@@ -128,16 +132,15 @@ data = generate_data(-1, -3, 0.9, 20000)
 ### --- (5) Estimate θ Using Rust's NFPA --- #############################################
 ######################################################################################
 
+
 # Given (a, i) and firm values, returns the evaluated logit formula.
 P(a, i, values) = exp(values[a, i + 1]) / (exp(values[a, 1]) + exp(values[a, 2]))
 
 # Given target (a, i) and data (a_point, i_point),
 # returns 1 if (a, i) match (a_point, i_point). Returns 0 otherwise.
-function count_combos(a, i, a_point, i_point)
-    (a_point == a) && (i_point == i) ? (return 1) : (return 0)
-end
+count_combos(a, i, a_point, i_point) = (a_point == a) && (i_point == i) ? 1 : 0
 
-# Given θ and data, returns the value of the joint log-likelihood function.
+# Given θ and data, returns the value of the joint negative log-likelihood function.
 function loglikelihood_1(θ, data)
     (μ, R) = θ
 
@@ -159,28 +162,25 @@ function loglikelihood_1(θ, data)
         Q_vec[index] = sum(broadcast(count_combos, index - 5, 1, a_vec, i_vec))
     end
 
-    return sum( log.(P_vec) .* Q_vec )
+    -sum( log.(P_vec) .* Q_vec )
 end
 
-# G is the negative of the log-likelihood function.
-G(θ) = -loglikelihood_1(θ, data)
-
 # Initial guesses for μ and R.
-(μ_hat, R_hat) = (0.0, 0.0)
+μ_hat, R_hat = (0.0, 0.0)
 θ_initial = copy([μ_hat, R_hat])
 
 # Minimize the negative log-likelihood function.
-res = @time optimize(G, θ_initial)
+res = @time optimize(θ -> loglikelihood_1(θ, data), θ_initial)
 θ_hat = Optim.minimizer(res)
 
 # Print.
-println("μ estimate: ", θ_hat[1])
-println("R estimate: ", θ_hat[2])
+println("μ estimate: ", θ_hat[1], "\nR estimate: ", θ_hat[2])
 
 
 ###################################################################################
 ### --- (6) Estimate θ Using Hotz & Miller's CCP Approach --- #####################
 ###################################################################################
+
 
 # Given data, returns 5×2 matrix of probalities:
 # prob[a, i] = probability of choice i at age a
@@ -198,7 +198,8 @@ function get_replacement_probs(data)
         prob[a, 2] = 1 - prob[a, 1]
 
     end
-    return prob
+
+    prob
 end
 
 # Given θ, replacement probability matrix, number of periods per simulation, 
@@ -207,7 +208,7 @@ end
 function simulate_forward_values(θ, replace_probs, periods, sims, β)
     (μ, R) = θ
     values = zeros(5, 2, sims)
-    γ = 0.57721566490153286060651209008240243
+    γ = MathConstants.eulergamma
 
     for sim in 1:sims
         for a in 1:5
@@ -235,11 +236,11 @@ function simulate_forward_values(θ, replace_probs, periods, sims, β)
             end
         end
     end
-    return mean(values, dims = 3)[:, :, 1]
+    mean(values, dims = 3)[:, :, 1]
 end
 
 # Given θ, data, and probabilities of replacement,
-# returns the value of the joint log-likelihood function.
+# returns the value of the negative joint log-likelihood function.
 function loglikelihood_2(θ, data, replace_probs)
     (μ, R) = θ
 
@@ -261,23 +262,24 @@ function loglikelihood_2(θ, data, replace_probs)
         Q_vec[index] = sum(broadcast(count_combos, index - 5, 1, a_vec, i_vec))
     end
 
-    return sum( log.(P_vec) .* Q_vec )
+    -sum( log.(P_vec) .* Q_vec )
 end
 
 # Get replacement probabilities.
 replace_probs = get_replacement_probs(data)
 
-# H is the negative of the log-likelihood function.
-H(θ) = -loglikelihood_2(θ, data, replace_probs)
-
 # Initial guesses for μ and R.
-(μ_hat, R_hat) = (-5.0, -5.0)
+μ_hat, R_hat = (-5.0, -5.0)
 θ_initial = copy([μ_hat, R_hat])
 
 # Minimize the negative log-likelihood function.
-res = @time optimize(H, θ_initial, Optim.Options(show_trace = true, iterations = 100))
+res = @time optimize(
+    θ -> loglikelihood_2(θ, data, replace_probs), 
+    θ_initial, Optim.Options(show_trace = true, iterations = 100)
+)
+
 θ_hat = Optim.minimizer(res)
 
 # Print.
-println("μ estimate: ", θ_hat[1])
-println("R estimate: ", θ_hat[2])
+println("μ estimate: ", θ_hat[1], "\nR estimate: ", θ_hat[2])
+
