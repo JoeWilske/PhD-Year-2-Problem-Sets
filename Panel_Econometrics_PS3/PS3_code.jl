@@ -11,7 +11,7 @@ using Statistics, Random, Distributions, Optim, LinearAlgebra
 
 
 # Define model
-function y_model(α0, β0)
+function model(α0, β0)
     x_i, ϵ_i = rand(Normal(0, 1), 2)
 
     y_i = α0 + x_i*β0 + ϵ_i
@@ -22,7 +22,7 @@ end
 # Generate data
 function generate_data(α0, β0, obs)
     α0 = fill(α0, obs)
-    return vcat(broadcast(y_model, α0, β0)...)
+    return vcat(broadcast(model, α0, β0)...)
 end
 
 # Generate data with α0 = 0.5, β0 = 1.0, and 100 0bservations
