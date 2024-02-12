@@ -75,7 +75,7 @@ function minimize_more(α_initial, β_initial, σ_initial, attempts, obs)
     vcat(
         minimize.(
             α_initial, β_initial, σ_initial, 
-            generate_data.(fill(0.5, attempts), 1.0, 1.0, obs)
+            generate_data.(0.5, 1.0, 1.0, fill(obs, attempts))
         )...
     )
 end
