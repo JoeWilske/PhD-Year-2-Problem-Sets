@@ -17,11 +17,11 @@ function model(α0, β0, σ0)
 
     y_i = α0 + x_i*β0 + ϵ_i
 
-    y_i > 0.0  ?  [x_i, y_i]'  :  [x_i, 0.0]'
+    (y_i > 0.0) ? [x_i, y_i]' : [x_i, 0.0]'
 end
 
 # Define data generating function
-generate_data(α0, β0, σ0, obs) = vcat(broadcast(model, fill(α0, obs), β0, σ0)...)
+generate_data(α0, β0, σ0, obs) = vcat(model.(fill(α0, obs), β0, σ0)...)
 
 # Generate data
 α0, β0, σ0, obs = (0.5, 1.0, 1.0, 100)
@@ -44,7 +44,7 @@ function f(α, β, σ, x, y)
 end
 
 # Define negative log-likelihood function
-log_likelihood(θ, data) = -sum(broadcast(f, θ[1], θ[2], θ[3], data[:, 1], data[:, 2]))
+log_likelihood(θ, data) = -sum(f.(θ[1], θ[2], θ[3], data[:, 1], data[:, 2]))
 
 # Define minimizer function
 function minimize(α_initial, β_initial, σ_initial, data)
@@ -73,9 +73,9 @@ println("α estimate:  ", θ_hat[1], "\nβ estimate:  ", θ_hat[2])
 function minimize_more(α_initial, β_initial, σ_initial, attempts, obs)
 
     vcat(
-        broadcast(
-            minimize, α_initial, β_initial, σ_initial, 
-            broadcast(generate_data, fill(0.5, attempts), 1.0, 1.0, obs)
+        minimize.(
+            α_initial, β_initial, σ_initial, 
+            generate_data.(fill(0.5, attempts), 1.0, 1.0, obs)
         )...
     )
 end
