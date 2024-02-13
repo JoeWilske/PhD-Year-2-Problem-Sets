@@ -13,13 +13,13 @@ using Statistics, Random, Distributions, Optim, LinearAlgebra
 
 
 # Profit function, not including ε shocks.
-π(a, i, μ, R) = (i == 0) ? (return a*μ) : (return R)
+π(a, i, μ, R) = (i == 0) ? (a*μ) : (R)
 
 # Log-sum formula of expected value. EV_0 is a 5-vector of expected values when i = 0,
 # and EV_1 is a 5-vector of expected values when i = 1.
 function log_sum(a, i, μ, R, EV_0, EV_1, β)
 
-    i == 0 ? (a = min(a + 1, 5)) : (a = 1)
+    (i == 0) ? (a = min(a + 1, 5)) : (a = 1)
 
     log( exp( π(a, 0, μ, R) + β*EV_0[a]) + exp( π(a, 1, μ, R) + β*EV_1[a]) )
 end
@@ -37,14 +37,14 @@ function contraction_map(μ, R, β)
 
     while true
 
-        EV_0 = broadcast(log_sum, α, 0, μ, R, Ref(EV_0), Ref(EV_1), β)
-        EV_1 = broadcast(log_sum, α, 1, μ, R, Ref(EV_0), Ref(EV_1), β)
+        EV_0 = log_sum.(α, 0, μ, R, Ref(EV_0), Ref(EV_1), β)
+        EV_1 = log_sum.(α, 1, μ, R, Ref(EV_0), Ref(EV_1), β)
 
         prev_V_0 = deepcopy(V_0)
         prev_V_1 = deepcopy(V_1)
 
-        V_0 = broadcast(value_function, α, 0, μ, R, Ref(EV_0), Ref(EV_1), β)
-        V_1 = broadcast(value_function, α, 1, μ, R, Ref(EV_0), Ref(EV_1), β)
+        V_0 = value_function.(α, 0, μ, R, Ref(EV_0), Ref(EV_1), β)
+        V_1 = value_function.(α, 1, μ, R, Ref(EV_0), Ref(EV_1), β)
         
         cond_0 = abs.(V_0 - prev_V_0) .== 0.0
         cond_1 = abs.(V_1 - prev_V_1) .== 0.0
@@ -91,7 +91,7 @@ function i_from_a(a, μ, R, V, β)
     V_0 = V[a, 1] + rand(Gumbel(0, 1))
     V_1 = V[a, 2] + rand(Gumbel(0, 1))
     
-    V_0 > V_1  ?  0  :  1
+    (V_0 > V_1)  ?  0  :  1
 end
 
 # Given μ, R, β, and number of observations T, generates a simulated dataset.
@@ -154,12 +154,12 @@ function loglikelihood_1(θ, data)
 
     for index in 1:5
         P_vec[index] = P(index, 0, values)
-        Q_vec[index] = sum(broadcast(count_combos, index, 0, a_vec, i_vec))
+        Q_vec[index] = sum(count_combos.(index, 0, a_vec, i_vec))
     end
 
     for index in 6:10
         P_vec[index] = P(index - 5, 1, values)
-        Q_vec[index] = sum(broadcast(count_combos, index - 5, 1, a_vec, i_vec))
+        Q_vec[index] = sum(count_combos.(index - 5, 1, a_vec, i_vec))
     end
 
     -sum( log.(P_vec) .* Q_vec )
@@ -194,7 +194,7 @@ function get_replacement_probs(data)
 
         a_occurrences = count(x -> x == a, a_vec)
         
-        prob[a, 1] = sum( broadcast(count_combos, a, 0, a_vec, i_vec) ) / a_occurrences
+        prob[a, 1] = sum(count_combos.(a, 0, a_vec, i_vec)) / a_occurrences
         prob[a, 2] = 1 - prob[a, 1]
 
     end
@@ -254,12 +254,12 @@ function loglikelihood_2(θ, data, replace_probs)
 
     for index in 1:5
         P_vec[index] = P(index, 0, values)
-        Q_vec[index] = sum(broadcast(count_combos, index, 0, a_vec, i_vec))
+        Q_vec[index] = sum(count_combos.(index, 0, a_vec, i_vec))
     end
 
     for index in 6:10
         P_vec[index] = P(index - 5, 1, values)
-        Q_vec[index] = sum(broadcast(count_combos, index - 5, 1, a_vec, i_vec))
+        Q_vec[index] = sum(count_combos.(index - 5, 1, a_vec, i_vec))
     end
 
     -sum( log.(P_vec) .* Q_vec )
@@ -274,8 +274,8 @@ replace_probs = get_replacement_probs(data)
 
 # Minimize the negative log-likelihood function.
 res = @time optimize(
-    θ -> loglikelihood_2(θ, data, replace_probs), 
-    θ_initial, Optim.Options(show_trace = true, iterations = 100)
+    θ -> loglikelihood_2(θ, data, replace_probs), θ_initial,
+    Optim.Options(show_trace = true, iterations = 100)
 )
 
 θ_hat = Optim.minimizer(res)
