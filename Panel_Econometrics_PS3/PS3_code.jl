@@ -47,10 +47,7 @@ end
 log_likelihood(θ, data) = -sum(f.(θ[1], θ[2], θ[3], data[:, 1], data[:, 2]))
 
 # Define minimizer function
-function minimize(α_initial, β_initial, σ_initial, data)
-
-    θ_initial = [α_initial, β_initial, σ_initial]
-
+function minimize(θ_initial , data)
     # Minimize the negative log-likelihood function.
     Optim.minimizer(
         optimize(θ -> log_likelihood(θ, data), θ_initial)
@@ -58,8 +55,9 @@ function minimize(α_initial, β_initial, σ_initial, data)
 end
 
 # Find minimum of negative log-likelihood
-α_initial, β_initial, σ_initial = (0.0, 0.0, 2.0)
-θ_hat = minimize(α_initial, β_initial, σ_initial, data)
+# θ_initial = [α_initial, β_initial, σ_initial]
+θ_initial = [0.0, 0.0, 2.0]
+θ_hat = minimize(θ_initial , data)
 
 # Print
 println("α estimate:  ", θ_hat[1], "\nβ estimate:  ", θ_hat[2])
@@ -70,11 +68,11 @@ println("α estimate:  ", θ_hat[1], "\nβ estimate:  ", θ_hat[2])
 
 # Takes initial parameter guesses as inputs, as well as number of estimations to perform.
 # Generates new data each time to avoid getting the same estimates every run.
-function minimize_more(α_initial, β_initial, σ_initial, attempts, obs)
+function minimize_more(θ_initial, attempts, obs)
 
     vcat(
         minimize.(
-            α_initial, β_initial, σ_initial, 
+            Ref(θ_initial), 
             generate_data.(0.5, 1.0, 1.0, fill(obs, attempts))
         )...
     )
@@ -82,7 +80,7 @@ end
 
 # Do MLE estimates 400 times, each with 100 observations.
 attempts, obs = (400, 100)
-estimates_100 = minimize_more(α_initial, β_initial, σ_initial, attempts, obs)
+estimates_100 = minimize_more(θ_initial, attempts, obs)
 
 # Define mean bias function. Returns in order of (α, β)
 mean_bias(estimates) = ( mean(estimates[:, 1] .- 0.5), mean(estimates[:, 2] .- 1.0) )
@@ -106,9 +104,9 @@ println(
 
 # Do MLE estimates 400 times, each with 200 observations, and then each with 400 obs.
 obs = 200
-estimates_200 = minimize_more(α_initial, β_initial, σ_initial, attempts, obs)
+estimates_200 = minimize_more(θ_initial, attempts, obs)
 obs = 400
-estimates_400 = minimize_more(α_initial, β_initial, σ_initial, attempts, obs)
+estimates_400 = minimize_more(θ_initial, attempts, obs)
 
 # Find mean bias and MSE for α and β estimates for 200 observation data, and then 400 obs data.
 bias_200 = mean_bias(estimates_200)
