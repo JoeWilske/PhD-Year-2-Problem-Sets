@@ -4,7 +4,7 @@
 ### Date: December 21, 2023
 
 
-using Statistics, Random, Distributions, Optim, LinearAlgebra
+using Statistics, Random, Distributions, Optim, LinearAlgebra, BenchmarkTools
 
 
 ####################################################################################
@@ -242,7 +242,6 @@ end
 # Given θ, data, and probabilities of replacement,
 # returns the value of the negative joint log-likelihood function.
 function loglikelihood_2(θ, data, replace_probs)
-    (μ, R) = θ
 
     a_vec = data[:, 1]
     i_vec = data[:, 2]
