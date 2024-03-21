@@ -11,6 +11,7 @@ using Statistics, Random, Distributions, Optim, LinearAlgebra
 
 # Define model
 function model(α0, β0, σ0)
+    
     x_i = rand(Normal(0, 1))
     ϵ_i = rand(Normal(0, σ0))
 
@@ -18,7 +19,11 @@ function model(α0, β0, σ0)
 
     (y_i > 0.0) ? (d_i = 1) : (d_i = 0.0)
 
-    (y_i > 0.0) ? [x_i, y_i, d_i]' : [x_i, 0.0, d_i]'
+    if y_i > 0.0
+        return [x_i, y_i, d_i]'
+    else
+        return [x_i, 0.0, d_i]'
+
 end
 
 # Define data generating function
