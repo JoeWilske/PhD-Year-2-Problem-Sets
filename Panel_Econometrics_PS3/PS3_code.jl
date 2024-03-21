@@ -52,6 +52,7 @@ function minimize(θ_initial , data)
     Optim.minimizer(
         optimize(θ -> log_likelihood(θ, data), θ_initial)
     )'
+    
 end
 
 # Find minimum of negative log-likelihood

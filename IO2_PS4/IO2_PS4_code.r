@@ -127,6 +127,28 @@ estimates_table <- kable(table_data, align = "c", caption = "Estimates and Stand
 ################################################################################################
 
 
+# Define function to find how many individuals choose d = 1 for each price
+find_d_totals <- function(insdata, P) {
+  
+  D <- vector("numeric", length = 6)
+  
+  for (i in seq_along(insdata$d)) {
+    
+    for (j in seq_along(P)) {
+      
+      if (P[j] == insdata$p[i]) {
+        
+        D[j] <- D[j] + 1
+        
+      }
+    }
+  }
+  return (D)
+}
+
+# Execute above function
+D <- find_d_totals(insdata, P)
+
 # Create point-data to graph
 point_data <- data.frame(
   prices = P,
