@@ -1,11 +1,11 @@
-# Panel Econometrics: Problem Set 4, Problem 1
+# Panel Econometrics: Problem Set 4
 # Author: Joe Wilske
-# Date: March 28, 2024
+# Date: March 25, 2024
 
 using Statistics, Random, Distributions, Optim, LinearAlgebra
 
 #################################################################################################
-### --- Problem 1 --- ###########################################################################
+### --- Problem 1: Semi-Parametric Estimators --- ###############################################
 #################################################################################################
 
 
@@ -23,6 +23,7 @@ function model(α0, β0, σ0)
         return [x_i, y_i, d_i]'
     else
         return [x_i, 0.0, d_i]'
+    end
 
 end
 
@@ -105,19 +106,21 @@ s_estimates_400 = more_score_estimation(400, 400, precision, θ0)
 # Score estimator can only give estimates to scale, so we'll compare the estimates to normalized α0 and β0.
 (α_norm, β_norm) = ( normalize([α0, β0])[1], normalize([α0, β0])[2] )
 
-# Define mean bias function. Returns in order of (α, β)
-mean_bias(estimates) = ( mean(estimates[:, 1] .- α_norm), mean(estimates[:, 2] .- β_norm) )
+# Define mean bias function for normalized (α, β). Returns in order of (α, β)
+mean_bias_norms(estimates, α_norm, β_norm) = ( mean(estimates[:, 1] .- α_norm),
+                                               mean(estimates[:, 2] .- β_norm) )
 
-# Define mean squared error function. Returns in order of (α, β)
-MSE(estimates) = ( mean((estimates[:, 1] .- α_norm) .^ 2), mean((estimates[:, 2] .- β_norm) .^ 2) )
+# Define mean squared error function for normalized (α, β). Returns in order of (α, β)
+MSE_norms(estimates, α_norm, β_norm) = ( mean((estimates[:, 1] .- α_norm) .^ 2),
+                                         mean((estimates[:, 2] .- β_norm) .^ 2) )
 
 # Find mean bias and MSE for α and β estimates for 100, 200, and 400 observation data.
-bias_100 = mean_bias(s_estimates_100)
-mse_100 = MSE(s_estimates_100)
-bias_200 = mean_bias(s_estimates_200)
-mse_200 = MSE(s_estimates_200)
-bias_400 = mean_bias(s_estimates_400)
-mse_400 = MSE(s_estimates_400)
+bias_100 = mean_bias_norms(s_estimates_100, α_norm, β_norm)
+mse_100 = MSE_norms(s_estimates_100, α_norm, β_norm)
+bias_200 = mean_bias_norms(s_estimates_200, α_norm, β_norm)
+mse_200 = MSE_norms(s_estimates_200, α_norm, β_norm)
+bias_400 = mean_bias_norms(s_estimates_400, α_norm, β_norm)
+mse_400 = MSE_norms(s_estimates_400, α_norm, β_norm)
 
 # Print all
 println(
@@ -257,13 +260,21 @@ c_estimates_100 = more_clad_estimation(400, 100, θ_initial, θ0)
 c_estimates_200 = more_clad_estimation(400, 200, θ_initial, θ0)
 c_estimates_400 = more_clad_estimation(400, 400, θ_initial, θ0)
 
+# Define mean bias function. Returns in order of (α, β)
+mean_bias(estimates, α0, β0) = ( mean(estimates[:, 1] .- α0),
+                               mean(estimates[:, 2] .- β0) )
+
+# Define mean squared error function. Returns in order of (α, β)
+MSE(estimates, α0, β0) = ( mean((estimates[:, 1] .- α0) .^ 2),
+                         mean((estimates[:, 2] .- β0) .^ 2) )
+
 # Find mean bias and MSE for α and β estimates for 100, 200, and 400 observation data.
-bias_100 = mean_bias(c_estimates_100)
-mse_100 = MSE(c_estimates_100)
-bias_200 = mean_bias(c_estimates_200)
-mse_200 = MSE(c_estimates_200)
-bias_400 = mean_bias(c_estimates_400)
-mse_400 = MSE(c_estimates_400)
+bias_100 = mean_bias(c_estimates_100, α0, β0)
+mse_100 = MSE(c_estimates_100, α0, β0)
+bias_200 = mean_bias(c_estimates_200, α0, β0)
+mse_200 = MSE(c_estimates_200, α0, β0)
+bias_400 = mean_bias(c_estimates_400, α0, β0)
+mse_400 = MSE(c_estimates_400, α0, β0)
 
 # Print all
 println(
@@ -343,12 +354,12 @@ p_estimates_200 = more_pwd_estimation(400, 200, θ_initial, θ0)
 p_estimates_400 = more_pwd_estimation(400, 400, θ_initial, θ0)
 
 # Find mean bias and MSE for α and β estimates for 100, 200, and 400 observation data.
-bias_100 = mean_bias(p_estimates_100)
-mse_100 = MSE(p_estimates_100)
-bias_200 = mean_bias(p_estimates_200)
-mse_200 = MSE(p_estimates_200)
-bias_400 = mean_bias(p_estimates_400)
-mse_400 = MSE(p_estimates_400)
+bias_100 = mean_bias(p_estimates_100, α0, β0)
+mse_100 = MSE(p_estimates_100, α0, β0)
+bias_200 = mean_bias(p_estimates_200, α0, β0)
+mse_200 = MSE(p_estimates_200, α0, β0)
+bias_400 = mean_bias(p_estimates_400, α0, β0)
+mse_400 = MSE(p_estimates_400, α0, β0)
 
 # Print all
 println(
@@ -366,3 +377,76 @@ println(
     "\nβ MSE:        ", round(mse_400[2], digits = 4)
 )
 
+
+#################################################################################################
+### --- Problem 2: Non-Parametric (Kernel) Estimator --- ########################################
+#################################################################################################
+
+
+# Returns n × 2 matrix of x's and y's
+function generate_data(n, γ0)
+
+    x = rand(Uniform(-1, 1), n)
+    ϵ = rand(Normal(0, 1), n)
+
+    y = γ0 .+ x .+ ϵ
+
+    return hcat(x, y)
+
+end
+
+# Takes (x, y) matrix as data and the central_x around which to estimate y.
+# Uses bandwidth h = n^(-1/5)
+# Returns E[y | x = central_x]
+function kernal_estimator(data, central_x)
+
+    (x, y) = (data[:, 1], data[:, 2])
+    h = length(data[:, 1])^(- 0.2)
+
+    within_band = ifelse.(abs.(x .- central_x) .< h/2, 1, 0)
+
+    return sum(y .* within_band) / sum(within_band)
+
+end
+
+# Takes number of simulations to run, observations per simulation,
+# and the central x around which to estimate.
+function more_kernel_estimation(num_sims, n, central_x, γ0)
+
+    simulated_data = generate_data.(fill(n, num_sims), γ0)
+
+    estimates = kernal_estimator.(simulated_data, central_x)
+
+    return estimates
+
+end
+
+# Set true γ
+γ0 = 0.5
+
+# Estimate 401 simulations, with 400 observations, around x = 0
+estimates_0 = more_kernel_estimation(401, 400, 0, γ0)
+# Estimate 401 simulations, with 400 observations, around x = 1
+estimates_1 = more_kernel_estimation(401, 400, 1, γ0)
+
+# Define mean bias function
+mean_bias_kernel(estimates, central_x, γ0) = mean(estimates .- (central_x + γ0))
+
+# Define root mean squared error (RMSE) function
+RMSE(estimates, central_x, γ0) = mean((estimates .- (central_x + γ0)) .^ 2) ^ 0.5
+
+# Find mean-bias and RMSE for central_x = 0 and central_x = 1
+bias_0 = mean_bias_kernel(estimates_0, 0.0, γ0)
+rmse_0 = RMSE(estimates_0, 0.0, γ0)
+bias_1 = mean_bias_kernel(estimates_1, 1.0, γ0)
+rmse_1 = RMSE(estimates_1, 1.0, γ0)
+
+# Print all
+println(
+    "\nKERNEL, x = 0",
+    "\nmean bias:    ", round(bias_0, digits = 3),
+    "\nRMSE:         ", round(rmse_0, digits = 3), "\n",
+    "\nKERNEL, x = 1",
+    "\nmean bias:    ", round(bias_1, digits = 3),
+    "\nRMSE:         ", round(rmse_1, digits = 3)
+)
