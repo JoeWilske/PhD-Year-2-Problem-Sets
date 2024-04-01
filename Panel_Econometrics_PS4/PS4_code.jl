@@ -403,9 +403,9 @@ function kernal_estimator(data, central_x)
     (x, y) = (data[:, 1], data[:, 2])
     h = length(data[:, 1])^(- 0.2)
 
-    within_band = ifelse.(abs.(x .- central_x) .< h/2, 1, 0)
+    K = ifelse.(abs.(x .- central_x) .< h/2, 1, 0)
 
-    return sum(y .* within_band) / sum(within_band)
+    return sum(y .* K) / sum(K)
 
 end
 
@@ -433,13 +433,13 @@ estimates_1 = more_kernel_estimation(401, 400, 1, γ0)
 mean_bias_kernel(estimates, central_x, γ0) = mean(estimates .- (central_x + γ0))
 
 # Define root mean squared error (RMSE) function
-RMSE(estimates, central_x, γ0) = mean((estimates .- (central_x + γ0)) .^ 2) ^ 0.5
+RMSE_kernel(estimates, central_x, γ0) = mean((estimates .- (central_x + γ0)) .^ 2) ^ 0.5
 
 # Find mean-bias and RMSE for central_x = 0 and central_x = 1
 bias_0 = mean_bias_kernel(estimates_0, 0.0, γ0)
-rmse_0 = RMSE(estimates_0, 0.0, γ0)
+rmse_0 = RMSE_kernel(estimates_0, 0.0, γ0)
 bias_1 = mean_bias_kernel(estimates_1, 1.0, γ0)
-rmse_1 = RMSE(estimates_1, 1.0, γ0)
+rmse_1 = RMSE_kernel(estimates_1, 1.0, γ0)
 
 # Print all
 println(
