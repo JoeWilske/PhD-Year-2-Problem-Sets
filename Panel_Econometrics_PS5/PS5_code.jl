@@ -2,7 +2,7 @@
 # Author: Joe Wilske
 # Date: April 2, 2024
 
-using Statistics, Random, Distributions, Optim, LinearAlgebra
+using Statistics, Random, Distributions, Optim, LinearAlgebra, CSV, DataFrames, GLM
 
 
 #################################################################################################
@@ -77,7 +77,6 @@ estimates_1 = more_LLE(401, 400, 1.0, γ0, θ_initial)
 
 # Define mean bias function for α estimates
 mean_bias_LLE(estimates, central_x, γ0) = mean(estimates[:, 1] .- (central_x + γ0))
-
 # Define root mean squared error (RMSE) function for α estimates
 RMSE_LLE(estimates, central_x, γ0) = mean((estimates[:, 1] .- (central_x + γ0)) .^ 2) ^ 0.5
 
@@ -89,12 +88,15 @@ rmse_1 = RMSE_LLE(estimates_1, 1.0, γ0)
 
 # Print all
 println(
-    "\nLLE, x = 0",
+    "\n-----------------------",
+    "\nLLE with x = 0",
     "\nmean bias:    ", round(bias_0, digits = 3),
-    "\nRMSE:         ", round(rmse_0, digits = 3), "\n",
-    "\nLLE, x = 1",
+    "\nRMSE:         ", round(rmse_0, digits = 3),
+    "\n=======================",
+    "\nLLE with x = 1",
     "\nmean bias:    ", round(bias_1, digits = 3),
-    "\nRMSE:         ", round(rmse_1, digits = 3)
+    "\nRMSE:         ", round(rmse_1, digits = 3),
+    "\n------------------------"
 )
 
 
@@ -103,7 +105,51 @@ println(
 #################################################################################################
 
 
-# Propensity Score
-function p(data)
+# Get path to directory
+dir = @__DIR__
 
+# Set path to CSV
+csv_file = joinpath(dir, "jtrain2.csv")
+
+# Read-in dataset
+df = CSV.read(csv_file, DataFrame)
+
+# Given data frame, returns a vector of individuals' calculated propensity score_estimator
+# as estimated by a probit regression of train on some variables
+function prop_score(df)
+
+    data_mat = hcat(
+        ones(length(df[:, :black])),
+        df[:, :black],
+        df[:, :hisp],
+        df[:, :married],
+        df[:, :nodegree],
+        df[:, :re74].^2,
+        df[:, :re75].^2
+    )
+
+    probit_model = glm(@formula(train ~ black + hisp + married + nodegree + re74^2 + re75^2), df, Binomial(), ProbitLink())
+
+    probit_fit = coef(probit_model)
     
+    return data_mat * probit_fit
+end
+
+# Execute above function. Propensity is a vector of individual propensity scores.
+propensity = prop_score(df)
+
+# Add propensity to data frame
+df[!, :propensity] = propensity
+
+# Run OLS regression 18.23 from Wooldridge
+OLS_1823 = lm(@formula(unem78 ~ train + propensity), df)
+
+# Add propensity deviation from mean to data frame
+df[!, :propdeviation] = df[:, :train] .* (propensity .- mean(propensity))
+
+# Run OLS regression 18.24 from Wooldridge
+OLS_1824 = lm(@formula(unem78 ~ train + propensity + propdeviation), df)
+
+# Run a third OLS regression, this time with no propensity score controls
+OLS_3 = lm(@formula(unem78 ~ train + black + hisp + married + nodegree + re74^2 + re75^2), df)
+

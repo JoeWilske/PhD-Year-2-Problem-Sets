@@ -9,9 +9,6 @@ library(kableExtra)
 library(ggplot2)
 
 
-# Set path for saving plots
-#path <- ""
-
 # Read-in dataset
 insdata <- read.csv("C:/Gitdir/Projects/PhD-Year-2-Problem-Sets/IO2_PS4/insdata.csv")
 
